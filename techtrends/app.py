@@ -72,12 +72,12 @@ def create():
     return render_template("create.html")
 
 
-@app.route("/status")
-def status():
+@app.route("/healthz")
+def healthz():
     response = app.response_class(
         response=json.dumps({"result": "OK - healthy"}), status=200, mimetype="application/json"
     )
-    app.logger.info("Status Request Successfull")
+    app.logger.info("Healthz Request Successfull")
     return response
 
 
