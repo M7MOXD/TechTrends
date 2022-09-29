@@ -1,13 +1,17 @@
-import sqlite3
+import sqlite3, logging, sys
 from flask import Flask, jsonify, json, render_template, request, url_for, redirect, flash
 from werkzeug.exceptions import abort
-import logging
+
+# Number of Connections
+conn_count = 0
 
 # Function to get a database connection.
 # This function connects to database with the name `database.db`
 def get_db_connection():
+    global conn_count
     connection = sqlite3.connect("database.db")
     connection.row_factory = sqlite3.Row
+    conn_count += 1
     return connection
 
 
@@ -39,7 +43,7 @@ def index():
 def post(post_id):
     post = get_post(post_id)
     if post is None:
-        app.logger.info("Article Not Found")
+        app.logger.error("Article Not Found")
         return render_template("404.html"), 404
     else:
         app.logger.info(f"Article {post['title']} Retrieved Successfully")
@@ -72,6 +76,7 @@ def create():
     return render_template("create.html")
 
 
+# Define the Healthz Route
 @app.route("/healthz")
 def healthz():
     response = app.response_class(
@@ -81,10 +86,17 @@ def healthz():
     return response
 
 
+# Define the Metrics Route
 @app.route("/metrics")
 def metrics():
+    connection = get_db_connection()
+    post_count = connection.execute("SELECT * FROM posts").fetchall()
+    post_count = len(post_count)
+    connection.close()
     response = app.response_class(
-        response=json.dumps({"status": "success", "code": 0, "data": {"db_connection_count": 1, "post_count": 7}}),
+        response=json.dumps(
+            {"status": "success", "code": 0, "data": {"db_connection_count": conn_count, "post_count": post_count}}
+        ),
         status=200,
         mimetype="application/json",
     )
@@ -94,5 +106,9 @@ def metrics():
 
 # start the application on port 3111
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG)
+    stdout_handler = logging.StreamHandler(sys.stdout)
+    stderr_handler = logging.StreamHandler(sys.stderr)
+    format_output = "%(levelname)s: %(name)-2s - [%(asctime)s] - %(message)s"
+    handlers = [stderr_handler, stdout_handler]
+    logging.basicConfig(format=format_output, handlers=handlers, level=logging.DEBUG)
     app.run(host="0.0.0.0", port="3111")
